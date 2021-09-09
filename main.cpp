@@ -88,6 +88,10 @@ bool setup_symsrv() {
 }
 
 bool do_load_pdb(const std::string &library_path) {
+    if (!PathFileExistsA(library_path.c_str())) {
+        fprintf(stderr, "do_load_pdb, no such file %s\n", library_path.c_str());
+        return false;
+    }
     fprintf(stderr, "do_load_pdb: %s\n", library_path.c_str());
     HRESULT HR;
     if (FAILED(HR = DiaDataSource->loadDataForExe(to_wstring(library_path).c_str(), nullptr, &libdiaCallback))) {
