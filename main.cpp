@@ -133,10 +133,12 @@ void do_print_nt_symbol_path() {
     delete[] buffer;
 }
 
-const std::string jdk_bin_server = "jdk\\bin\\server\\jvm.dll";
+const std::string bin_server_jvm_dll = "bin\\server\\jvm.dll";
 
-const std::string jvmdll_symbols_same_folder = R"(C:\Users\Kirill.Timofeev\Downloads\openjdk-jdk17-windows-x86_64-server-release\\)" + jdk_bin_server;
-const std::string jvmdll_no_symbol = "C:\\Users\\Kirill.Timofeev\\.jdks\\corretto-1.8.0_302\\" + jdk_bin_server;
+const std::string jvmdll_symbols_same_folder = R"(C:\Users\Kirill.Timofeev\Downloads\openjdk-jdk17-windows-x86_64-server-release\jdk\)" + bin_server_jvm_dll;
+const std::string jvmdll_no_symbol = "C:\\Users\\Kirill.Timofeev\\.jdks\\corretto-1.8.0_302\\jre\\" + bin_server_jvm_dll;
+
+const std::string jbr_symbols_on_server = "C:\\Users\\Kirill.Timofeev\\AppData\\Local\\JetBrains\\Toolbox\\apps\\IDEA-U\\ch-0\\213.3358\\jbr\\";
 
 const std::string ntdll_local_symsrv_lookup = R"(C:\Windows\SYSTEM32\ntdll.dll)";
 
@@ -147,7 +149,7 @@ int main() {
     do_print_nt_symbol_path();
 
 
-    //if(!do_load_pdb(jvmdll_symbols_same_folder)) return -3;
+    if(!do_load_pdb(jvmdll_symbols_same_folder)) return -3;
     if(!do_load_pdb(jvmdll_no_symbol)) return -3;
     //if(!do_load_pdb(ntdll_local_symsrv_lookup)) return -3;
 

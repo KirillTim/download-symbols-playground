@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="get_symbols_playground jetbrains _NT_SYMBOL_PATH" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="get_symbols_playground" TARGET_NAME="get_symbols_playground" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="get_symbols_playground" RUN_TARGET_NAME="get_symbols_playground">
+    <envs>
+      <env name="_NT_SYMBOL_PATH" value="srv*C:\\JBRSymbols*https://resources.jetbrains.com/pdb" />
+    </envs>
+    <method v="2">
+      <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+    </method>
+  </configuration>
+</component>
