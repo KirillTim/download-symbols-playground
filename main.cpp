@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <exception>
+#include <stdexcept>
 
 #include "Windows.h"
 
@@ -16,15 +18,12 @@
 const char* libdia_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\msdia140.dll)";
 const char* symsrv_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\symsrv.dll)";
 
-CComPtr<IDiaDataSource> DiaDataSource;
-CComPtr<IDiaSession> DiaSession;
-
 std::string dia_error_string(HRESULT error_code) {
     switch (error_code) {
         case E_PDB_NOT_FOUND:
-            return "Can't open file";
+            return "E_PDB_NOT_FOUND";
         case E_PDB_FORMAT:
-            return "Invalid file format";
+            return "E_PDB_FORMAT";
         case E_INVALIDARG:
             return "Invalid parameter";
         case E_UNEXPECTED:
@@ -41,6 +40,59 @@ std::string dia_error_string(HRESULT error_code) {
     }
 }
 
+static std::runtime_error dia_exception(const std::string &message, const HRESULT HR) {
+    return std::runtime_error(message + ": " + dia_error_string(HR));
+}
+
+class DiaLibraryWrapper {
+public:
+    DiaLibraryWrapper(const std::string &library_path) {
+        if (!PathFileExistsA(library_path.c_str())) {
+            throw std::runtime_error("do_load_pdb, no such file: " + library_path);
+        }
+        _library_path = library_path;
+
+        HRESULT HR;
+        if (FAILED(HR = NoRegCoCreate(msdia_dll, CLSID_DiaSource, IID_IDiaDataSource,
+                                      reinterpret_cast<LPVOID *>(&_diaDataSource)))) {
+            throw dia_exception("NoRegCoCreate", HR);
+        }
+
+        if (FAILED(HR = _diaDataSource->loadDataForExe(to_wstring(library_path).c_str(), nullptr, &libdiaCallback))) {
+            throw dia_exception("loadDataForExe('" + library_path + "')", HR);
+        }
+
+        if (FAILED(HR = _diaDataSource->openSession(&_diaSession))) {
+            throw dia_exception("openSession", HR);
+        }
+    }
+
+    bool do_load_pdb() {
+        HRESULT HR;
+        CComPtr<IDiaSymbol> pSymbol;
+        if (FAILED(HR = _diaSession->get_globalScope(&pSymbol))) {
+            throw dia_exception("can't DiaSession->get_globalScope", HR);
+        } else {
+            GUID pdbGuid;
+            if (FAILED(HR = pSymbol->get_guid(&pdbGuid))) {
+                throw dia_exception("can't pSymbol->get_guid", HR);
+            } else {
+                OLECHAR szGUID[64] = {0};
+                StringFromGUID2(pdbGuid, szGUID, 64);
+                auto guid_str = guid_to_string(&pdbGuid);
+                fprintf(stderr, "library: %s, GUID: %s\n", _library_path.c_str(), guid_str.c_str());
+            }
+        }
+        return true;
+    }
+
+
+private:
+    const static constexpr wchar_t *msdia_dll = L"msdia140.dll";
+    std::string _library_path;
+    CComPtr<IDiaDataSource> _diaDataSource;
+    CComPtr<IDiaSession> _diaSession;
+};
 
 bool load_libdia_and_symsrv() {
     HMODULE loaded_libdia = LoadLibraryA(libdia_path);
@@ -53,15 +105,6 @@ bool load_libdia_and_symsrv() {
         fprintf(stderr, "can't load symsrv, error code: %lu\n", GetLastError());
         return false;
     }
-
-    HRESULT HR;
-    const wchar_t *msdia_dll = L"msdia140.dll";
-    if (FAILED(HR = NoRegCoCreate(msdia_dll, CLSID_DiaSource, IID_IDiaDataSource,
-                                  reinterpret_cast<LPVOID *>(&DiaDataSource)))) {
-        fprintf(stderr, "NoRegCoCreate: %s\n", dia_error_string(HR).c_str());
-        return false;
-    }
-
     return true;
 }
 
@@ -87,45 +130,6 @@ bool setup_symsrv() {
     return true;
 }
 
-bool do_load_pdb(const std::string &library_path) {
-    if (!PathFileExistsA(library_path.c_str())) {
-        fprintf(stderr, "do_load_pdb, no such file %s\n", library_path.c_str());
-        return false;
-    }
-    fprintf(stderr, "do_load_pdb: %s\n", library_path.c_str());
-    HRESULT HR;
-    if (FAILED(HR = DiaDataSource->loadDataForExe(to_wstring(library_path).c_str(), nullptr, &libdiaCallback))) {
-        fprintf(stderr, "loadDataForExe('%s'): %s\n", library_path.c_str(), dia_error_string(HR).c_str());
-        DiaDataSource.Release();
-        CoUninitialize();
-        return false;
-    }
-
-    if (FAILED(HR = DiaDataSource->openSession(&DiaSession))) {
-        fprintf(stderr, "openSession: %s\n", dia_error_string(HR).c_str());
-        DiaDataSource.Release();
-        CoUninitialize();
-        return false;
-    }
-
-    CComPtr<IDiaSymbol> pSymbol;
-    if (FAILED(HR = DiaSession->get_globalScope(&pSymbol))) {
-        fprintf(stderr, "can't DiaSession->get_globalScope: %s\n", dia_error_string(HR).c_str());
-    } else {
-        GUID pdbGuid;
-        if (FAILED(HR = pSymbol->get_guid(&pdbGuid))) {
-            fprintf(stderr, "can't pSymbol->get_guid: %s\n", dia_error_string(HR).c_str());
-        } else {
-            OLECHAR szGUID[64] = { 0 };
-            StringFromGUID2(pdbGuid, szGUID, 64);
-            auto guid_str = guid_to_string(&pdbGuid);
-            fprintf(stderr, "library: %s, GUID: %s\n", library_path.c_str(), guid_str.c_str());
-        }
-    }
-
-    return true;
-}
-
 void do_print_nt_symbol_path() {
     char* buffer = new char[1024];
     DWORD result = GetEnvironmentVariable("_NT_SYMBOL_PATH", buffer, 1024);
@@ -142,7 +146,7 @@ const std::string bin_server_jvm_dll = "bin\\server\\jvm.dll";
 const std::string jvmdll_symbols_same_folder = R"(C:\Users\Kirill.Timofeev\Downloads\openjdk-jdk17-windows-x86_64-server-release\jdk\)" + bin_server_jvm_dll;
 const std::string jvmdll_no_symbol = "C:\\Users\\Kirill.Timofeev\\.jdks\\corretto-1.8.0_302\\jre\\" + bin_server_jvm_dll;
 
-const std::string jbr_symbols_on_server = "C:\\Users\\Kirill.Timofeev\\AppData\\Local\\JetBrains\\Toolbox\\apps\\IDEA-U\\ch-0\\213.3358\\jbr\\";
+const std::string jbr_symbols_on_server = "C:\\Users\\Kirill.Timofeev\\AppData\\Local\\JetBrains\\Toolbox\\apps\\IDEA-U\\ch-0\\213.3358\\jbr\\" + bin_server_jvm_dll;
 
 const std::string ntdll_local_symsrv_lookup = R"(C:\Windows\SYSTEM32\ntdll.dll)";
 
@@ -151,11 +155,32 @@ int main() {
     if (!setup_symsrv()) return -2;
 
     do_print_nt_symbol_path();
+    try {
 
+        {
+            DiaLibraryWrapper _dia_jvmdll_symbols_same_folder(jvmdll_symbols_same_folder);
+            _dia_jvmdll_symbols_same_folder.do_load_pdb();
+            CoUninitialize();
+        }
+        /*{
+            DiaLibraryWrapper _dia_jvmdll_no_symbol(jvmdll_no_symbol);
+            _dia_jvmdll_no_symbol.do_load_pdb();
+            CoUninitialize();
+        }*/
 
-    if(!do_load_pdb(jvmdll_symbols_same_folder)) return -3;
-    if(!do_load_pdb(jvmdll_no_symbol)) return -3;
-    //if(!do_load_pdb(ntdll_local_symsrv_lookup)) return -3;
+        {
+            DiaLibraryWrapper _dia_jbr_symbols_on_server(jbr_symbols_on_server);
+            _dia_jbr_symbols_on_server.do_load_pdb();
+        }
+
+        {
+            DiaLibraryWrapper _dia_ntdll_local_symsrv_lookup(ntdll_local_symsrv_lookup);
+            _dia_ntdll_local_symsrv_lookup.do_load_pdb();
+        }
+
+    } catch (const std::runtime_error &ex) {
+        fprintf(stderr, "%s", ex.what());
+    }
 
     return 0;
 }
