@@ -94,24 +94,26 @@ private:
     CComPtr<IDiaSession> _diaSession;
 };
 
-bool load_libdia_and_symsrv() {
+HMODULE load_libdia() {
     HMODULE loaded_libdia = LoadLibraryA(libdia_path);
     if (!loaded_libdia) {
         fprintf(stderr, "can't load libdia, error code: %lu\n", GetLastError());
-        return false;
+        return nullptr;
     }
+    return loaded_libdia;
+}
+
+HMODULE load_symsrv() {
     HMODULE loaded_symsrv = LoadLibraryA(symsrv_path);
     if (!loaded_symsrv) {
         fprintf(stderr, "can't load symsrv, error code: %lu\n", GetLastError());
-        return false;
+        return nullptr;
     }
-    return true;
+    return loaded_symsrv;
 }
 
 // see https://jetbrains.team/p/llvm/repositories/llvm-project/files/6f6d0a12e1260e0fd79fbcd1f5df2ebb48002db8/lldb/source/Plugins/SymbolFile/PDB/SymbolFilePDB.cpp?tab=source&line=436
-bool setup_symsrv() {
-    // already loaded in `load_libdia_and_symsrv` actually, only need a handle
-    auto symSrvMod = LoadLibraryA(symsrv_path);
+bool setup_symsrv(HMODULE symSrvMod) {
     if (!symSrvMod) {
         fprintf(stderr, "can't LoadLibraryA for symsrv: %lu", GetLastError());
         return false;
@@ -124,9 +126,9 @@ bool setup_symsrv() {
         return false;
     }
 
-    m_sym_srv_set_opt(SSRVOPT_TRACE, TRUE);
-    m_sym_srv_set_opt(SSRVOPT_UNATTENDED, TRUE);
-    m_sym_srv_set_opt(SSRVOPT_CALLBACK, reinterpret_cast<ULONG64>(&symbolservercallback));
+    if (!m_sym_srv_set_opt(SSRVOPT_CALLBACK, reinterpret_cast<ULONG64>(&symbolservercallback))) {
+        return false;
+    }
     return true;
 }
 
@@ -151,8 +153,8 @@ const std::string jbr_symbols_on_server = "C:\\Users\\Kirill.Timofeev\\AppData\\
 const std::string ntdll_local_symsrv_lookup = R"(C:\Windows\SYSTEM32\ntdll.dll)";
 
 int main() {
-    if (!load_libdia_and_symsrv()) return -1;
-    if (!setup_symsrv()) return -2;
+    if (!load_libdia()) return -1;
+    if (!setup_symsrv(load_symsrv())) return -2;
 
     do_print_nt_symbol_path();
     try {
