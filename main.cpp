@@ -18,6 +18,8 @@
 const char* libdia_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\msdia140.dll)";
 const char* symsrv_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\symsrv.dll)";
 
+const char* NT_SYMBOL_PATH = "_NT_SYMBOL_PATH";
+
 std::string dia_error_string(HRESULT error_code) {
     switch (error_code) {
         case E_PDB_NOT_FOUND:
@@ -134,13 +136,27 @@ bool setup_symsrv(HMODULE symSrvMod) {
 
 void do_print_nt_symbol_path() {
     char* buffer = new char[1024];
-    DWORD result = GetEnvironmentVariable("_NT_SYMBOL_PATH", buffer, 1024);
+    DWORD result = GetEnvironmentVariable(NT_SYMBOL_PATH, buffer, 1024);
     if (result == 0) {
         fprintf(stderr, "can't GetEnvironmentVariable: %lu\n", GetLastError());
         return;
     }
     fprintf(stderr, "_NT_SYMBOL_PATH: '%s'\n", buffer);
     delete[] buffer;
+}
+
+bool do_append_nt_symbol_path(const std::string& value) {
+    char* buffer = new char[1024];
+    DWORD result = GetEnvironmentVariable(NT_SYMBOL_PATH, buffer, 1024);
+    if (result == 0) {
+        DWORD err = GetLastError();
+        if (err != ERROR_ENVVAR_NOT_FOUND) {
+            fprintf(stderr, "can't GetEnvironmentVariable: %lu\n", err);
+            return false;
+        }
+    }
+    std::string new_value = std::string(buffer) + ";" + value;
+    return SetEnvironmentVariable(NT_SYMBOL_PATH, new_value.c_str());
 }
 
 const std::string bin_server_jvm_dll = "bin\\server\\jvm.dll";
@@ -152,34 +168,24 @@ const std::string jbr_symbols_on_server = "C:\\Users\\Kirill.Timofeev\\AppData\\
 
 const std::string ntdll_local_symsrv_lookup = R"(C:\Windows\SYSTEM32\ntdll.dll)";
 
+void do_load_pdb_for_file(const std::string& library_path) {
+    DiaLibraryWrapper _dia_wrapper(library_path);
+    auto result = _dia_wrapper.do_load_pdb();
+    CoUninitialize();
+}
+
 int main() {
+    if (!do_append_nt_symbol_path("srv*C:\\\\JBRSymbols*https://resources.jetbrains.com/pdb")) return -3;
+    do_print_nt_symbol_path();
+
     if (!load_libdia()) return -1;
     if (!setup_symsrv(load_symsrv())) return -2;
 
-    do_print_nt_symbol_path();
     try {
-
-        {
-            DiaLibraryWrapper _dia_jvmdll_symbols_same_folder(jvmdll_symbols_same_folder);
-            _dia_jvmdll_symbols_same_folder.do_load_pdb();
-            CoUninitialize();
-        }
-        /*{
-            DiaLibraryWrapper _dia_jvmdll_no_symbol(jvmdll_no_symbol);
-            _dia_jvmdll_no_symbol.do_load_pdb();
-            CoUninitialize();
-        }*/
-
-        {
-            DiaLibraryWrapper _dia_jbr_symbols_on_server(jbr_symbols_on_server);
-            _dia_jbr_symbols_on_server.do_load_pdb();
-        }
-
-        {
-            DiaLibraryWrapper _dia_ntdll_local_symsrv_lookup(ntdll_local_symsrv_lookup);
-            _dia_ntdll_local_symsrv_lookup.do_load_pdb();
-        }
-
+        do_load_pdb_for_file(jvmdll_symbols_same_folder);
+        //do_load_pdb_for_file(jvmdll_no_symbol);
+        do_load_pdb_for_file(jbr_symbols_on_server);
+        do_load_pdb_for_file(ntdll_local_symsrv_lookup);
     } catch (const std::runtime_error &ex) {
         fprintf(stderr, "%s", ex.what());
     }
