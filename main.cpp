@@ -170,7 +170,7 @@ const std::string ntdll_local_symsrv_lookup = R"(C:\Windows\SYSTEM32\ntdll.dll)"
 
 void do_load_pdb_for_file(const std::string& library_path) {
     DiaLibraryWrapper _dia_wrapper(library_path);
-    auto result = _dia_wrapper.do_load_pdb();
+    _dia_wrapper.do_load_pdb();
     CoUninitialize();
 }
 
