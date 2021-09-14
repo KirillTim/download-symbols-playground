@@ -15,6 +15,7 @@
 #include "symsrv_callback.h"
 #include "util.h"
 
+const char* dbghelp_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\dbghelp.dll)";
 const char* libdia_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\msdia140.dll)";
 const char* symsrv_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\symsrv.dll)";
 
@@ -105,6 +106,15 @@ HMODULE load_libdia() {
     return loaded_libdia;
 }
 
+HMODULE load_dbghelp() {
+    HMODULE loaded_dbghelp = LoadLibraryA(dbghelp_path);
+    if (!loaded_dbghelp) {
+        fprintf(stderr, "can't load dbghelp, error code: %lu\n", GetLastError());
+        return nullptr;
+    }
+    return loaded_dbghelp;
+}
+
 HMODULE load_symsrv() {
     HMODULE loaded_symsrv = LoadLibraryA(symsrv_path);
     if (!loaded_symsrv) {
@@ -164,6 +174,8 @@ const std::string bin_server_jvm_dll = "bin\\server\\jvm.dll";
 const std::string jvmdll_symbols_same_folder = R"(C:\Users\Kirill.Timofeev\Downloads\openjdk-jdk17-windows-x86_64-server-release\jdk\)" + bin_server_jvm_dll;
 const std::string jvmdll_no_symbol = "C:\\Users\\Kirill.Timofeev\\.jdks\\corretto-1.8.0_302\\jre\\" + bin_server_jvm_dll;
 
+// the same file located in: data\jbr_jvm_dll\debugsymbols_on_server\jvm.dll
+// C:\Users\Kirill.Timofeev\Work\get-symbols-playground\data\jbr_jvm_dll\debugsymbols_on_server\jvm.dll
 const std::string jbr_symbols_on_server = "C:\\Users\\Kirill.Timofeev\\AppData\\Local\\JetBrains\\Toolbox\\apps\\IDEA-U\\ch-0\\213.3358\\jbr\\" + bin_server_jvm_dll;
 
 const std::string ntdll_local_symsrv_lookup = R"(C:\Windows\SYSTEM32\ntdll.dll)";
@@ -179,6 +191,8 @@ int main() {
     do_print_nt_symbol_path();
 
     if (!load_libdia()) return -1;
+    // doesn't affect events sent to `symbolservercallback`
+    // if (!load_dbghelp()) return -1;
     if (!setup_symsrv(load_symsrv())) return -2;
 
     try {
