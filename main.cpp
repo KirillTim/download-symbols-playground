@@ -17,7 +17,7 @@
 
 const char* dbghelp_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\dbghelp.dll)";
 const char* libdia_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\msdia140.dll)";
-const char* symsrv_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\symsrv.dll)";
+const char* symsrv_path = R"(C:\Users\Kirill.Timofeev\Work\get-symbols-playground\libs\symsrv_last_version\symsrv.dll)";
 
 const char* NT_SYMBOL_PATH = "_NT_SYMBOL_PATH";
 
