@@ -13,6 +13,7 @@ std::string to_string(const std::wstring &wstr) {
     return conv.to_bytes(wstr);
 }
 
+// https://stackoverflow.com/questions/1672677/print-a-guid-variable/1672698
 static std::string guid_to_string(GUID* guid)
 {
     char guid_string[37]; // 32 hex chars + 4 hyphens + null terminator

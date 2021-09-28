@@ -3,7 +3,6 @@
 
 #include <cstdio>
 #include <string>
-
 #include "util.h"
 
 BOOL symbolservercallback(
@@ -11,10 +10,12 @@ BOOL symbolservercallback(
         ULONG64 data,
         ULONG64 context
 ) {
-    //fprintf(stderr, "symbolservercallback, action: %llu\n", action);
     if (action == SSRVACTION_XMLOUTPUT) {
         std::string text = to_string(std::wstring(reinterpret_cast<wchar_t *>(data)));
-        fprintf(stderr, "SSRVACTION_XMLOUTPUT:\n %s\n\n", text.c_str());
+        if (text.find("<Progress percent=") == std::string::npos) {
+            // ignore download progress messages
+            fprintf(stderr, "SSRVACTION_XMLOUTPUT: %s\n", text.c_str());
+        }
         return TRUE;
     }
     return FALSE;
